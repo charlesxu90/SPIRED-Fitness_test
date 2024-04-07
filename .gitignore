@@ -1,0 +1,9 @@
+.git/
+.idea/
+.DS_Store/
+__pycache__/
+results/
+.ipynb_checkpoints/
+data/
+env/
+figures/
