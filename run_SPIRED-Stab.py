@@ -1,4 +1,5 @@
 import os
+import tqdm
 import click
 import torch
 import numpy as np
@@ -42,11 +43,13 @@ def main(fasta_file, saved_folder):
     # write pred value by appending to a csv file
     if not os.path.exists(saved_folder):
         os.makedirs(saved_folder)
-    
-    with open(f'{saved_folder}/pred.csv', 'w') as f:
+
+    fasta_file_basename = os.path.basename(fasta_file).split('.')[0]    
+    with open(f'{saved_folder}/{fasta_file_basename}_pred.csv', 'w') as f:
         f.write('id,ddG,dTm\n')
 
-        for id, seq in zip(id_list, seq_list):
+        # add tqdm to show progress
+        for id, seq in tqdm.tqdm(zip(id_list, seq_list), total = len(id_list), ncols=80):
             wt_seq, mut_seq = seq.split(':')
 
             # wt_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[0].seq)

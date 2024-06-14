@@ -8,7 +8,7 @@ Following [SPIRED-Fitness](https://github.com/Gonglab-THU/SPIRED-Fitness).
 # Install SPIRED-Fitness
 mamba create -n spired_fitness python=3.11
 conda activate spired_fitness
-pip install click einops pandas biopython
+pip install click einops pandas biopython tqdm
 pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu118
 ```
 
