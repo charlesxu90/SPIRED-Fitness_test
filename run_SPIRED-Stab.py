@@ -32,31 +32,49 @@ def main(fasta_file, saved_folder):
     esm2_batch_converter = esm2_alphabet.get_batch_converter()
     
     # save sequence information
-    wt_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[0].seq)
-    mut_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[1].seq)
+    # load fasta file
+    id_list = []
+    seq_list = []
+    for record in SeqIO.parse(fasta_file, 'fasta'):
+        id_list.append(record.id)
+        seq_list.append(str(record.seq))
+
+    # write pred value by appending to a csv file
+    if not os.path.exists(saved_folder):
+        os.makedirs(saved_folder)
     
-    mut_pos_torch_list = torch.tensor((np.array(list(wt_seq)) != np.array(list(mut_seq))).astype(int).tolist())
-    
-    # predict
-    with torch.no_grad():
+    with open(f'{saved_folder}/pred.csv', 'w') as f:
+        f.write('id,ddG,dTm\n')
+
+        for id, seq in zip(id_list, seq_list):
+            wt_seq, mut_seq = seq.split(':')
+
+            # wt_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[0].seq)
+            # mut_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[1].seq)
+            
+            mut_pos_torch_list = torch.tensor((np.array(list(wt_seq)) != np.array(list(mut_seq))).astype(int).tolist())
+            
+            # predict
+            with torch.no_grad():
+                
+                # data
+                f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(wt_seq, esm2_3B, esm2_650M, esm2_batch_converter)
+                wt_data = {
+                    'target_tokens': target_tokens,
+                    'esm2-3B': f1d_esm2_3B,
+                    'embedding': f1d_esm2_650M
+                }
+                f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(mut_seq, esm2_3B, esm2_650M, esm2_batch_converter)
+                mut_data = {
+                    'target_tokens': target_tokens,
+                    'esm2-3B': f1d_esm2_3B,
+                    'embedding': f1d_esm2_650M
+                }
+                ddG, dTm, wt_features, mut_features = model(wt_data, mut_data, mut_pos_torch_list)
+
+                # write to csv
+                f.write(f'{id},{ddG.item()},{dTm.item()}\n')
         
-        # data
-        f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(wt_seq, esm2_3B, esm2_650M, esm2_batch_converter)
-        wt_data = {
-            'target_tokens': target_tokens,
-            'esm2-3B': f1d_esm2_3B,
-            'embedding': f1d_esm2_650M
-        }
-        f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(mut_seq, esm2_3B, esm2_650M, esm2_batch_converter)
-        mut_data = {
-            'target_tokens': target_tokens,
-            'esm2-3B': f1d_esm2_3B,
-            'embedding': f1d_esm2_650M
-        }
-        ddG, dTm, wt_features, mut_features = model(wt_data, mut_data, mut_pos_torch_list)
-        
-        # write pred value
-        pd.DataFrame({'ddG': ddG.item(), 'dTm': dTm.item()}, index = [0]).to_csv(f'{saved_folder}/pred.csv', index = False)
 
 if __name__ == '__main__':
     main()
