@@ -15,8 +15,7 @@ working_directory = os.path.abspath(os.path.dirname(__file__))
 
 @click.command()
 @click.option('--fasta_file', required = True, type = str)
-@click.option('--saved_folder', required = True, type = str)
-def main(fasta_file, saved_folder):
+def main(fasta_file):
     
     # load parameter
     model = SPIRED_Stab(device_list = ['cpu', 'cpu', 'cpu', 'cpu'])
@@ -32,7 +31,13 @@ def main(fasta_file, saved_folder):
     esm2_3B.eval()
     esm2_batch_converter = esm2_alphabet.get_batch_converter()
     
-    # save sequence information
+    # load wt_seq from wt.fasta file in the fasta dir
+    dir_path = os.path.dirname(fasta_file)
+    wt_fasta_file = os.path.join(dir_path, 'wt.fasta')
+    if not os.path.exists(wt_fasta_file):
+        raise FileNotFoundError(f'wt.fasta file not found in {dir_path}. Please provide a valid wt.fasta file.')
+    wt_seq = str(list(SeqIO.parse(wt_fasta_file, 'fasta'))[0].seq)
+
     # load fasta file
     id_list = []
     seq_list = []
@@ -40,17 +45,11 @@ def main(fasta_file, saved_folder):
         id_list.append(record.id)
         seq_list.append(str(record.seq))
 
-    # write pred value by appending to a csv file
-    if not os.path.exists(saved_folder):
-        os.makedirs(saved_folder)
-
-    fasta_file_basename = os.path.basename(fasta_file).split('.')[0]    
-    with open(f'{saved_folder}/{fasta_file_basename}_pred.csv', 'w') as f:
+    with open(f'{fasta_file}_pred.csv', 'w') as f:
         f.write('id,ddG,dTm\n')
 
         # add tqdm to show progress
-        for id, seq in tqdm.tqdm(zip(id_list, seq_list), total = len(id_list), ncols=80):
-            wt_seq, mut_seq = seq.split(':')
+        for id, mut_seq in tqdm.tqdm(zip(id_list, seq_list), total = len(id_list), ncols=80):
 
             # wt_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[0].seq)
             # mut_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[1].seq)
