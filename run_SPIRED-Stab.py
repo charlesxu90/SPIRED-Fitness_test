@@ -15,7 +15,8 @@ working_directory = os.path.abspath(os.path.dirname(__file__))
 
 @click.command()
 @click.option('--fasta_file', required = True, type = str)
-def main(fasta_file):
+@click.option('--device', required = False, type = str, default = 'cuda:0',)
+def main(fasta_file, device):
     
     # load parameter
     model = SPIRED_Stab(device_list = ['cpu', 'cpu', 'cpu', 'cpu'])
@@ -24,10 +25,12 @@ def main(fasta_file):
     
     # load ESM-2 650M model
     esm2_650M, _ = torch.hub.load('facebookresearch/esm:main', 'esm2_t33_650M_UR50D')
+    esm2_650M.to(device)
     esm2_650M.eval()
     
     # load ESM-2 3B model
     esm2_3B, esm2_alphabet = torch.hub.load('facebookresearch/esm:main', 'esm2_t36_3B_UR50D')
+    esm2_3B.to(device)
     esm2_3B.eval()
     esm2_batch_converter = esm2_alphabet.get_batch_converter()
     
@@ -37,6 +40,14 @@ def main(fasta_file):
     if not os.path.exists(wt_fasta_file):
         raise FileNotFoundError(f'wt.fasta file not found in {dir_path}. Please provide a valid wt.fasta file.')
     wt_seq = str(list(SeqIO.parse(wt_fasta_file, 'fasta'))[0].seq)
+    
+    # embed wt_seq
+    f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(wt_seq, esm2_3B, esm2_650M, esm2_batch_converter, device=device)
+    wt_data = {
+        'target_tokens': target_tokens,
+        'esm2-3B': f1d_esm2_3B,
+        'embedding': f1d_esm2_650M
+    }
 
     # load fasta file
     id_list = []
@@ -50,31 +61,28 @@ def main(fasta_file):
 
         # add tqdm to show progress
         for id, mut_seq in tqdm.tqdm(zip(id_list, seq_list), total = len(id_list), ncols=80):
-
-            # wt_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[0].seq)
-            # mut_seq = str(list(SeqIO.parse(fasta_file, 'fasta'))[1].seq)
             
             mut_pos_torch_list = torch.tensor((np.array(list(wt_seq)) != np.array(list(mut_seq))).astype(int).tolist())
             
+            # embed mut_seq
+            f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(mut_seq, esm2_3B, esm2_650M, esm2_batch_converter, device=device)
+            mut_data = {
+                    'target_tokens': target_tokens,
+                    'esm2-3B': f1d_esm2_3B,
+                    'embedding': f1d_esm2_650M
+                }
+            
             # predict
             with torch.no_grad():
-                
-                # data
-                f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(wt_seq, esm2_3B, esm2_650M, esm2_batch_converter)
-                wt_data = {
-                    'target_tokens': target_tokens,
-                    'esm2-3B': f1d_esm2_3B,
-                    'embedding': f1d_esm2_650M
-                }
-                f1d_esm2_3B, f1d_esm2_650M, target_tokens = getStabDataTest(mut_seq, esm2_3B, esm2_650M, esm2_batch_converter)
-                mut_data = {
-                    'target_tokens': target_tokens,
-                    'esm2-3B': f1d_esm2_3B,
-                    'embedding': f1d_esm2_650M
-                }
+                # put all variables to 'cpu'
+                for key in wt_data:
+                    wt_data[key] = wt_data[key].to('cpu')
+                for key in mut_data:
+                    mut_data[key] = mut_data[key].to('cpu')
+                mut_pos_torch_list = mut_pos_torch_list.to('cpu')
+                model.to('cpu')
                 ddG, dTm, wt_features, mut_features = model(wt_data, mut_data, mut_pos_torch_list)
 
-                # write to csv
                 f.write(f'{id},{ddG.item()},{dTm.item()}\n')
         
 
