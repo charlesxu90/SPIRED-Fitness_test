@@ -19,8 +19,9 @@ working_directory = os.path.abspath(os.path.dirname(__file__))
 def main(fasta_file, device):
     
     # load parameter
-    model = SPIRED_Stab(device_list = ['cpu', 'cpu', 'cpu', 'cpu'])
+    model = SPIRED_Stab(device_list = [device, device, device, device])
     model.load_state_dict(torch.load(f'{working_directory}/data/model/SPIRED-Stab.pth'))
+    model.to(device)
     model.eval()
     
     # load ESM-2 650M model
@@ -72,17 +73,8 @@ def main(fasta_file, device):
                     'embedding': f1d_esm2_650M
                 }
             
-            # predict
             with torch.no_grad():
-                # put all variables to 'cpu'
-                for key in wt_data:
-                    wt_data[key] = wt_data[key].to('cpu')
-                for key in mut_data:
-                    mut_data[key] = mut_data[key].to('cpu')
-                mut_pos_torch_list = mut_pos_torch_list.to('cpu')
-                model.to('cpu')
                 ddG, dTm, wt_features, mut_features = model(wt_data, mut_data, mut_pos_torch_list)
-
                 f.write(f'{id},{mut_seq},{ddG.item()},{dTm.item()}\n')
         
 

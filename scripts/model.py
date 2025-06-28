@@ -920,7 +920,7 @@ class Model(torch.nn.Module):
         for block in self.blocks:
             wt_embedding, wt_pair = block(wt_embedding, wt_pair, wt_data['plddt'].unsqueeze(-1))
             mut_embedding, mut_pair = block(mut_embedding, mut_pair, mut_data['plddt'].unsqueeze(-1))
-        
+        mut_pos = mut_pos.to(mut_embedding.device)
         mut_dG = self.mlp((mut_embedding * mut_pos.unsqueeze(-1)).sum(1)).squeeze(-1)
         wt_dG = self.mlp((wt_embedding * mut_pos.unsqueeze(-1)).sum(1)).squeeze(-1)
         mut_dG = mut_dG * self.finetune_ddG_coef
@@ -935,8 +935,10 @@ class Model(torch.nn.Module):
 class SPIRED_Stab(torch.nn.Module):
     def __init__(self, device_list):
         super().__init__()
+        self.device_list = device_list
+        self.stab_device = device_list[-1]
         self.SPIRED = SPIRED_Model(depth=2, channel=128, device_list = device_list)
-        self.Stab = Model(node_dim = 32, num_layer = 3, n_head = 8, pair_dim = 64).to(device_list[-1])
+        self.Stab = Model(node_dim = 32, num_layer = 3, n_head = 8, pair_dim = 64).to(self.stab_device)
     
     def forward(self, wt_data, mut_data, mut_pos_torch_list):
         
@@ -947,9 +949,9 @@ class SPIRED_Stab(torch.nn.Module):
             'Plddt': wt_Plddt,
             'phi_psi_1D': wt_phi_psi_1D
         }
-        wt_data['pair'] = wt_Predxyz['4th'][-1].permute(0, 2, 3, 1).contiguous()
-        wt_data['plddt'] = wt_Plddt['4th'][-1]
-        wt_data['embedding'] = wt_data['embedding'].to(wt_data['pair'].device)
+        wt_data['pair'] = wt_Predxyz['4th'][-1].permute(0, 2, 3, 1).contiguous().to(self.stab_device)
+        wt_data['plddt'] = wt_Plddt['4th'][-1].to(self.stab_device)
+        wt_data['embedding'] = wt_data['embedding'].to(self.stab_device)
         
         # mut data
         mut_Predxyz, PredCadistavg, mut_Plddt, ca, cb, omega, theta, phi, mut_phi_psi_1D, seq_feats, pair_feats = self.SPIRED(mut_data['target_tokens'], mut_data['esm2-3B'], no_recycles=1)
@@ -958,9 +960,9 @@ class SPIRED_Stab(torch.nn.Module):
             'Plddt': mut_Plddt,
             'phi_psi_1D': mut_phi_psi_1D
         }
-        mut_data['pair'] = mut_Predxyz['4th'][-1].permute(0, 2, 3, 1).contiguous()
-        mut_data['plddt'] = mut_Plddt['4th'][-1]
-        mut_data['embedding'] = mut_data['embedding'].to(mut_data['pair'].device)
+        mut_data['pair'] = mut_Predxyz['4th'][-1].permute(0, 2, 3, 1).contiguous().to(self.stab_device)
+        mut_data['plddt'] = mut_Plddt['4th'][-1].to(self.stab_device)
+        mut_data['embedding'] = mut_data['embedding'].to(self.stab_device)
         
         ddG, dTm = self.Stab(wt_data, mut_data, mut_pos_torch_list)
         return ddG, dTm, wt_features, mut_features
