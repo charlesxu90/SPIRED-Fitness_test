@@ -57,7 +57,7 @@ def main(fasta_file, device):
         seq_list.append(str(record.seq))
 
     with open(f'{fasta_file}_pred.csv', 'w') as f:
-        f.write('id,ddG,dTm\n')
+        f.write('id,seq,ddG,dTm\n')
 
         # add tqdm to show progress
         for id, mut_seq in tqdm.tqdm(zip(id_list, seq_list), total = len(id_list), ncols=80):
@@ -83,7 +83,7 @@ def main(fasta_file, device):
                 model.to('cpu')
                 ddG, dTm, wt_features, mut_features = model(wt_data, mut_data, mut_pos_torch_list)
 
-                f.write(f'{id},{ddG.item()},{dTm.item()}\n')
+                f.write(f'{id},{mut_seq},{ddG.item()},{dTm.item()}\n')
         
 
 if __name__ == '__main__':
