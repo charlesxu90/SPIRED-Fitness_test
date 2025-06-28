@@ -17,5 +17,6 @@ Download the [model parameters](https://zenodo.org/doi/10.5281/zenodo.10589085) 
 ## Run
 ```shell
 conda activate spired_fitness
-python run_SPIRED-Stab.py --fasta_file data/example/test.fasta --saved_folder results/example
+python run_SPIRED-Stab.py --fasta_file data/example/test.fasta
+# will save as data/example/test.fasta_pred.csv by default
 ```
